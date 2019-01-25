@@ -1,0 +1,155 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: release-monitoring
+message: integreatly release-monitoring
+parameters:
+  - name: DB_URL
+    value: "sqlite:////var/data/anitya-dev.sqlite"
+  - name: ANITYA_WEB_CONFIG
+    value: /opt/anitya/dev.toml
+  - name: ANITYA_IMAGE
+    value: docker.io/odranoel/anitya:latest
+  - name: ANITYA_GITHUB_ACCESS_TOKEN
+    value: "defineme"
+  - name: GITHUB_OAUTH_KEY
+    value: "defineme"
+  - name: GITHUB_OAUTH_SECRET
+    value: "defineme"
+objects:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: anitya
+      labels:
+        app: anitya
+    stringData:
+      database-url: "${DB_URL}"
+      github-oauth-key: "${GITHUB_OAUTH_KEY}"
+      github-oauth-secret: "${GITHUB_OAUTH_SECRET}"
+      github-access-token: "${ANITYA_GITHUB_ACCESS_TOKEN}"
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      name: anitya-web
+      creationTimestamp: null
+      labels:
+        app: anitya
+        template: release-monitoring
+    spec:
+      to:
+        kind: Service
+        name: anitya
+        weight: 100
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+      wildcardPolicy: None
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: anitya
+      creationTimestamp: null
+      labels:
+        app: anitya
+        template: release-monitoring
+    spec:
+      ports:
+        - name: anitya-web
+          protocol: TCP
+          port: 5000
+          targetPort: 5000
+      selector:
+        name: anitya
+      type: ClusterIP
+      sessionAffinity: None
+    status:
+      loadBalancer: {}
+  - apiVersion: v1
+    kind: DeploymentConfig
+    metadata:
+      name: anitya
+      creationTimestamp: null
+      labels:
+        app: anitya
+        template: release-monitoring
+    spec:
+      strategy:
+        type: Recreate
+        recreateParams:
+          timeoutSeconds: 600
+        resources: {}
+        activeDeadlineSeconds: 21600
+      triggers:
+        - type: ConfigChange
+      replicas: 1
+      test: false
+      selector:
+        name: anitya
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            name: anitya
+        spec:
+          containers:
+            - name: anitya
+              image: ${ANITYA_IMAGE}
+              ports:
+                - containerPort: 5432
+                  protocol: TCP
+              env:
+                - name: DB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: anitya
+                      key: database-url
+                  #value: "${DB_URL}"
+                - name: ANITYA_WEB_CONFIG
+                  value: "${ANITYA_WEB_CONFIG}"
+                - name: GITHUB_ACCESS_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: anitya
+                      key: github-access-token
+                - name: SOCIAL_AUTH_GITHUB_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: anitya
+                      key: github-oauth-key
+                - name: SOCIAL_AUTH_GITHUB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: anitya
+                      key: github-oauth-secret
+              resources:
+                limits:
+                  memory: 512Mi
+              livenessProbe:
+                tcpSocket:
+                  port: 5000
+                initialDelaySeconds: 30
+                timeoutSeconds: 1
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              readinessProbe:
+                exec:
+                  command:
+                    - 'cat'
+                    - '/opt/anitya/scripts/entrypoint.sh'
+                initialDelaySeconds: 5
+                timeoutSeconds: 1
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              terminationMessagePath: /dev/termination-log
+              imagePullPolicy: Always
+              securityContext:
+                capabilities: {}
+                privileged: false
+          restartPolicy: Always
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext: {}
+    status: {}
