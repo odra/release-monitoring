@@ -1,7 +1,7 @@
 alembic==1.0.6
 aniso8601==4.1.0
 git+git://github.com/odra/anitya@mig-scripts-fix#egg=anitya
-arrow==0.13.0
+arrow==0.15.1
 attrs==18.2.0
 Automat==0.7.0
 blinker==1.4
