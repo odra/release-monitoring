@@ -48,7 +48,7 @@ social-auth-core==3.0.0
 social-auth-storage-sqlalchemy==1.1.0
 SQLAlchemy==1.2.16
 straight.plugin==1.5.0
-Twisted==18.9.0
+Twisted==22.10.0
 txWS==0.9.1
 txZMQ==0.8.0
 urllib3==1.24.1
